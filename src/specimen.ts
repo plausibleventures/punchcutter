@@ -94,8 +94,19 @@ const LABELS_FROM = 520;
 
 /** How large the display line may get, and the bounds the box it sits in is held between. */
 const HERO_MAX = 250;
-const HERO_MIN = 168;
-const HERO_MAX_BOX = 340;
+const HERO_MIN = 148;
+
+/**
+ * The tallest the display box may be.
+ *
+ * On a phone the controls are docked over the bottom half of the screen, so a box sized for a
+ * desktop leaves the running text underneath it off-screen — and the two being visible together is
+ * the entire reason they were put next to each other. A third of the viewport leaves room for both.
+ */
+function heroCeiling(): number {
+  const viewport = typeof window === 'undefined' ? 900 : window.innerHeight;
+  return Math.max(HERO_MIN, Math.min(340, viewport * 0.3));
+}
 
 export interface HeroOptions {
   text: string;
@@ -134,7 +145,7 @@ export function drawHero(canvas: HTMLCanvasElement, face: Face, pal: Palette, op
   // unstable under the hand that is using it.
   const byWidth = fit(face, text, column, HERO_MAX);
   const wanted = (vertical * byWidth) / UPM + pad * 1.1;
-  const height = Math.round(Math.max(HERO_MIN, Math.min(HERO_MAX_BOX, wanted)) / 16) * 16;
+  const height = Math.round(Math.max(HERO_MIN, Math.min(heroCeiling(), wanted)) / 16) * 16;
   const ctx = prepare(canvas, height);
   if (!ctx) return;
   const px = Math.min(byWidth, ((height - pad * 1.1) * UPM) / vertical);

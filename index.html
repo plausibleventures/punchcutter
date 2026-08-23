@@ -158,7 +158,14 @@
 
       <!-- The console: everything that changes the face. -->
       <aside class="console" id="console" aria-label="Typeface controls">
-        <div class="console__inner">
+        <!-- Only ever seen on a narrow screen, where the controls are docked to the bottom of the
+             viewport instead of sitting in a column beside the sheet. -->
+        <button class="console__handle" id="console-handle" type="button" aria-expanded="true" aria-controls="console-inner">
+          <span class="console__grip" aria-hidden="true"></span>
+          <span class="console__label">Controls</span>
+          <span class="console__family" id="console-family"></span>
+        </button>
+        <div class="console__inner" id="console-inner">
           <section class="panel">
             <h2 class="eyebrow">Family</h2>
             <div class="families" id="families" role="radiogroup" aria-label="Type family"></div>

@@ -332,6 +332,7 @@ function syncConsole(): void {
     note.append(clear);
   }
 
+  el('console-family').textContent = family.name;
   el('lesson-name').textContent = family.name;
   el('lesson-tag').textContent = family.tag;
   el('lesson-text').textContent = family.lesson;
@@ -688,6 +689,21 @@ el('download').addEventListener('click', download);
 el('share').addEventListener('click', () => void share());
 el('randomise').addEventListener('click', surprise);
 el('reset').addEventListener('click', () => pickFamily(state.design.family));
+
+/**
+ * The docked panel on a phone: open by default, collapsible to its handle.
+ *
+ * Open is the right default because the controls are the reason to be here, but a specimen is worth
+ * looking at whole, so the handle folds them away rather than making anybody scroll around them.
+ */
+const consoleBox = el('console');
+el('console-handle').addEventListener('click', () => {
+  const open = consoleBox.dataset.open !== 'false';
+  consoleBox.dataset.open = String(!open);
+  el('console-handle').setAttribute('aria-expanded', String(!open));
+  // The sheet has just changed how much room it has; the canvases are sized against it.
+  requestAnimationFrame(repaint);
+});
 
 // Canvases are sized in device pixels against a CSS box, so a window resize has to redraw — both
 // because the box changed and because a move to a screen of a different pixel density needs twice
