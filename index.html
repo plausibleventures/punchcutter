@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Punchcutter — draw a typeface, download the font</title>
+    <meta
+      name="description"
+      content="A parametric type foundry in the browser. Pick a family — sans, serif, mono or handwritten — move the sliders, and download a real .ttf you can install. Nothing leaves your machine."
+    />
+    <meta name="theme-color" content="#edefec" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101312" media="(prefers-color-scheme: dark)" />
+    <meta property="og:title" content="Punchcutter" />
+    <meta property="og:description" content="Sans, serif, mono or hand. Move the sliders, take the font file with you." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2315181a'/%3E%3Cpath d='M9 24V8h7a5 5 0 0 1 0 10h-4' stroke='%23edefec' stroke-width='3.4' fill='none' stroke-linecap='square'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#console">Skip to the controls</a>
+
+    <header class="bar">
+      <h1 class="bar__name">Punchcutter</h1>
+      <p class="bar__what">A parametric type foundry</p>
+      <p class="bar__where">Nothing you draw here leaves this tab.</p>
+    </header>
+
+    <main class="sheet">
+      <!-- The stage sits directly in the grid rather than inside the proof column, because on a
+           narrow screen the letters have to come before the controls and the controls before the
+           rest of the sheet — three blocks in three different orders from the one they are in here. -->
+      <section class="hero" aria-labelledby="hero-label">
+        <h2 class="eyebrow" id="hero-label">
+          The face<span class="eyebrow__hint">click the letters and type</span>
+        </h2>
+        <div class="hero__stage">
+          <canvas class="hero__canvas" id="hero" role="img"></canvas>
+          <input
+            class="hero__capture"
+            id="hero-capture"
+            type="text"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            aria-label="Specimen text"
+          />
+        </div>
+      </section>
+
+      <div class="sheet__proof">
+        <!-- The lesson. A specimen sheet has always been half catalogue and half argument for the
+             type on it; this is the argument, and for most visitors it is the first time anybody
+             has told them what the word on the button they just pressed actually means. -->
+        <section class="block lesson" aria-labelledby="lesson-label">
+          <h2 class="eyebrow" id="lesson-label">
+            <span id="lesson-name"></span><span class="eyebrow__hint" id="lesson-tag"></span>
+          </h2>
+          <div class="lesson__body">
+            <p id="lesson-text"></p>
+            <p class="lesson__good"><span>Good for</span> <em id="lesson-good"></em></p>
+          </div>
+        </section>
+
+        <section class="block" aria-labelledby="waterfall-label">
+          <h2 class="eyebrow" id="waterfall-label">Waterfall<span class="eyebrow__hint">the same line, getting smaller</span></h2>
+          <canvas class="block__canvas" id="waterfall" role="img" aria-label="The specimen line set at descending sizes"></canvas>
+        </section>
+
+        <section class="block" aria-labelledby="charset-label">
+          <h2 class="eyebrow" id="charset-label">
+            Character set<span class="eyebrow__hint" id="charset-count"></span>
+          </h2>
+          <canvas class="block__canvas" id="charset" role="img" aria-label="Every character in the typeface"></canvas>
+        </section>
+
+        <section class="block" aria-labelledby="anatomy-label">
+          <h2 class="eyebrow" id="anatomy-label">
+            Anatomy<span class="eyebrow__hint">the parts of a letter, named, in your face</span>
+          </h2>
+          <canvas class="block__canvas" id="anatomy" role="img" aria-label="A diagram naming the parts of a letter"></canvas>
+        </section>
+
+        <section class="block" aria-labelledby="text-label">
+          <h2 class="eyebrow" id="text-label">In text<span class="eyebrow__hint">set at 17 pixels</span></h2>
+          <canvas class="block__canvas" id="paragraph" role="img" aria-label="A paragraph set in the typeface"></canvas>
+        </section>
+
+        <section class="colophon" aria-labelledby="colophon-label">
+          <h2 class="eyebrow" id="colophon-label">How it is drawn</h2>
+          <div class="colophon__body">
+            <p>
+              A punchcutter cut every letter in reverse, by hand, into the end of a steel bar, struck that punch into
+              copper to make a matrix, and cast the type from it. One size, one weight, one alphabet, several months.
+              Nothing about the job was parametric.
+            </p>
+            <p>
+              This draws letters the way a designer thinks about them rather than the way a font file stores them: as
+              the path a pen walks. Each letter is a run of straight lines and circular arcs, and the solid shape is
+              recovered by sampling that skeleton and pushing each sample out along its own normal by half of
+              whatever the width is there. Bowls are rounded boxes with elliptical corners, so one slider carries the
+              face from a circle to a rectangle without any letter needing a second drawing — and because the width may
+              vary along a stroke, a shoulder can thin where it runs into a stem, which is the thing every drawn
+              typeface does and no single-width pen can.
+            </p>
+            <p>
+              The four families come out of that same skeleton rather than four sets of drawings. Serifs are the shape
+              put on a stroke end that stands in open air — which is why an E gets them on the tips of its arms and not
+              where those arms disappear into its stem, and why an O, having no ends at all, gets none. Contrast is a
+              trick of coordinates: the letter is drawn horizontally squashed, stroked with the same round pen, and
+              stretched back out, which turns that round pen into an elliptical one and thickens every upright while
+              leaving the horizontals alone. Monospace decides the advance first and fits the letter to it. And the
+              hand is knocked off the line by a wobble seeded from each letter, so an a is always the same a.
+            </p>
+            <p>
+              The spacing between letters is measured rather than guessed. Every glyph is reduced to a silhouette —
+              how far its ink reaches in each horizontal band — and a pair like AV or To is pulled together by the
+              difference between how far apart they actually sit and how far apart their own sidebearings promised.
+              It is applied on this page and written into the file as a real kerning table, so what you are looking at
+              is spaced the way the font will be.
+            </p>
+            <p>
+              The download is a TrueType file assembled here, in this tab: eleven tables, a checksum over the whole
+              thing patched back into the header, and the same outlines you have been looking at. There is no server,
+              no account, and no upload. A face you do not want anybody to see never goes anywhere.
+            </p>
+            <p class="colophon__note">
+              Everything you make with it is yours, with no conditions. It is one of the
+              <a href="https://plausible.ventures">Plausible Ventures</a>.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <!-- The console: everything that changes the face. -->
+      <aside class="console" id="console" aria-label="Typeface controls">
+        <div class="console__inner">
+          <section class="panel">
+            <h2 class="eyebrow">Family</h2>
+            <div class="families" id="families" role="radiogroup" aria-label="Type family"></div>
+          </section>
+
+          <section class="panel">
+            <h2 class="eyebrow" id="axes-label">The axes</h2>
+            <div class="axes" id="axes"></div>
+            <div class="axes__foot">
+              <button class="ghost" type="button" id="randomise">Surprise me</button>
+              <button class="ghost" type="button" id="reset">Reset</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2 class="eyebrow">Style<span class="eyebrow__hint">sets the letterforms too</span></h2>
+            <div class="presets" id="presets"></div>
+          </section>
+
+          <section class="panel">
+            <h2 class="eyebrow">Letterforms<span class="eyebrow__hint">swap the shapes themselves</span></h2>
+            <p class="panel__note panel__note--lead">
+              Sliders change a letter's proportions. These change which letter it is. They are the
+              handful whose construction real typefaces disagree about, and they carry more of a
+              face's identity than every other control here put together.
+            </p>
+            <div class="alts" id="alts"></div>
+          </section>
+
+          <section class="panel">
+            <h2 class="eyebrow">Take it with you</h2>
+            <label class="field">
+              <span class="field__label">Name this face</span>
+              <input class="field__input" id="fontname" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <button class="solid" type="button" id="download">Download .ttf</button>
+            <button class="ghost ghost--wide" type="button" id="share">Copy link to this face</button>
+            <p class="panel__note" id="status">The link carries the family and every axis, shown or not.</p>
+          </section>
+        </div>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

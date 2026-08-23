@@ -1,0 +1,712 @@
+/*
+ * The sheet.
+ *
+ * The page is a type specimen, so it is laid out like one: the proof takes the width and the
+ * numbers live in the margin, the way the metrics are printed down the side of a foundry sheet.
+ * Nothing here is allowed to compete with the letters — the interface is set small, in one mono, in
+ * one colour, and the only saturated thing on the page is the spot colour on the metric rules.
+ *
+ * That colour is verdigris: the blue-green a copper matrix goes when it oxidises. It is the one
+ * decision made for this subject rather than for a page in general.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #edefec;
+  --paper-sunk: #e5e8e3;
+  --ink: #15181a;
+  --rule: #c7cdc5;
+  --rule-soft: #d9ded7;
+  --muted: #6f7a6f;
+  --verd: #1d6b5b;
+  --verd-lit: #2f9d83;
+  --verd-wash: rgba(29, 107, 91, 0.09);
+
+  --mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --tech: 'Martian Mono', 'DM Mono', ui-monospace, monospace;
+
+  --rail: 21rem;
+  --gutter: clamp(1.25rem, 3.2vw, 3rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #101312;
+    --paper-sunk: #171b19;
+    --ink: #e7eae6;
+    --rule: #2c332f;
+    --rule-soft: #232926;
+    --muted: #808c83;
+    --verd: #4fbfa3;
+    --verd-lit: #7fd9c2;
+    --verd-wash: rgba(79, 191, 163, 0.11);
+  }
+}
+
+@font-face {
+  font-family: 'Martian Mono';
+  src: url('/fonts/martian-mono.woff2') format('woff2');
+  font-weight: 300 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Mono';
+  src: url('/fonts/dm-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Mono';
+  src: url('/fonts/dm-mono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--verd);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--verd);
+  outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  background: var(--paper);
+  padding: 0.6rem 1rem;
+}
+.skip:focus {
+  left: 0;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The masthead
+   --------------------------------------------------------------------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem 1.4rem;
+  flex-wrap: wrap;
+  padding: 1.05rem var(--gutter);
+  border-bottom: 1px solid var(--rule);
+}
+
+.bar__name {
+  margin: 0;
+  font-family: var(--tech);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.bar__what {
+  margin: 0;
+  color: var(--muted);
+}
+
+.bar__where {
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Sheet and margin
+   --------------------------------------------------------------------------------------------- */
+
+.sheet {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--rail);
+  grid-template-areas:
+    'hero console'
+    'proof console';
+}
+
+.hero {
+  grid-area: hero;
+  min-width: 0;
+}
+
+.console {
+  grid-area: console;
+}
+
+.sheet__proof {
+  grid-area: proof;
+  min-width: 0;
+  padding: 0 0 6rem;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0 var(--gutter) 0.7rem;
+  font-family: var(--tech);
+  font-size: 0.63rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.eyebrow__hint {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+/* The stage. The one place on the page allowed to be loud. */
+
+.hero {
+  padding: clamp(1.5rem, 4vw, 3rem) 0 clamp(1rem, 2.5vw, 2rem);
+}
+
+.hero__stage {
+  position: relative;
+  cursor: text;
+}
+
+.hero__canvas {
+  display: block;
+  width: 100%;
+  height: clamp(190px, 27vw, 320px);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The real input is invisible but sits *inside* the stage rather than off the left of the page.
+   Parking it at a negative offset makes focusing it a scroll to somewhere else, which browsers only
+   sometimes let `preventScroll` suppress; keeping it where the letters are means there is nowhere
+   to scroll to. The caret you can see is drawn on the canvas, because it has to sit on the baseline
+   of a font that does not exist anywhere a text field could reach. */
+.hero__capture {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.block {
+  padding: clamp(1.6rem, 3.5vw, 2.75rem) 0 0;
+  border-top: 1px solid var(--rule-soft);
+  margin-top: clamp(1.6rem, 3.5vw, 2.75rem);
+}
+
+.block__canvas {
+  display: block;
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Colophon
+   --------------------------------------------------------------------------------------------- */
+
+.colophon {
+  padding: clamp(1.6rem, 3.5vw, 2.75rem) 0 0;
+  border-top: 1px solid var(--rule-soft);
+  margin-top: clamp(1.6rem, 3.5vw, 2.75rem);
+}
+
+.colophon__body {
+  /* A measure in `ch` is set against the mono, which is wide; 62 of them is a column narrow enough
+     to look like an accident next to the full-width sheet above it. */
+  max-width: 46rem;
+  padding: 0 var(--gutter);
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.colophon__body p {
+  margin: 0 0 1em;
+}
+
+.colophon__note {
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   The console
+   --------------------------------------------------------------------------------------------- */
+
+.console {
+  border-left: 1px solid var(--rule);
+  min-height: calc(100dvh - 3.6rem);
+  /* A slider drag that starts a pixel off the handle would otherwise sweep a text selection across
+     the whole page, which looks like the tool has broken. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.console input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.console__inner {
+  position: sticky;
+  top: 0;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.panel {
+  padding: 1.35rem 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.panel .eyebrow {
+  padding: 0 0 0.9rem;
+}
+
+.panel__note--lead {
+  margin: 0 0 0.8rem !important;
+}
+
+.panel__note {
+  margin: 0.85rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* The family picker. Four genres, each with the six words that separate it from the others. */
+
+.families {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.family {
+  display: grid;
+  grid-template-columns: 4.4rem 1fr;
+  align-items: baseline;
+  gap: 0 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: transparent;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.family:hover {
+  border-color: var(--verd);
+}
+
+.family[aria-checked='true'] {
+  border-color: var(--verd);
+  background: var(--verd-wash);
+}
+
+.family__name {
+  font-family: var(--tech);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.family[aria-checked='true'] .family__name {
+  color: var(--verd);
+}
+
+.family__tag {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* The lesson block on the sheet. */
+
+.lesson__body {
+  max-width: 46rem;
+  padding: 0 var(--gutter);
+}
+
+.lesson__body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.lesson__good {
+  margin-top: 0.85em !important;
+  color: var(--ink) !important;
+}
+
+.lesson__good span {
+  font-family: var(--tech);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--verd);
+  margin-right: 0.5em;
+}
+
+.lesson__good em {
+  font-style: normal;
+}
+
+/* Axes. Each row is a label, a tabular number, and a rule the handle rides. */
+
+.axes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.axis[hidden] {
+  display: none;
+}
+
+.axis {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.6rem;
+  padding: 0.4rem 0 0.5rem;
+  border-radius: 3px;
+}
+
+.axis:hover,
+.axis--live {
+  background: var(--verd-wash);
+  box-shadow: 0 0 0 0.45rem var(--verd-wash);
+}
+
+.axis__name {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.axis__value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--verd);
+}
+
+.axis__slider {
+  grid-column: 1 / -1;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  margin: 0.15rem 0 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.axis__slider::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--rule);
+}
+.axis__slider::-moz-range-track {
+  height: 1px;
+  background: var(--rule);
+}
+
+/* A quad of type metal, sitting on the rule. */
+.axis__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 15px;
+  margin-top: -7px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ink);
+}
+.axis__slider::-moz-range-thumb {
+  width: 9px;
+  height: 15px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+.axis__note {
+  grid-column: 1 / -1;
+  margin: 0.3rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.18s ease, opacity 0.18s ease;
+}
+
+.axis:hover .axis__note,
+.axis--live .axis__note,
+.axis:focus-within .axis__note {
+  max-height: 4rem;
+  opacity: 1;
+}
+
+.axes__foot {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+
+/* Buttons */
+
+.ghost,
+.solid {
+  border-radius: 2px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.ghost {
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  flex: 1;
+}
+
+.ghost:hover {
+  border-color: var(--verd);
+  color: var(--verd);
+}
+
+.ghost--wide {
+  width: 100%;
+  margin-top: 0.45rem;
+}
+
+.solid {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--verd);
+  background: var(--verd);
+  color: var(--paper);
+  font-weight: 500;
+}
+
+.solid:hover {
+  background: var(--verd-lit);
+  border-color: var(--verd-lit);
+}
+
+/* Presets */
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.preset {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: transparent;
+  padding: 0.45rem 0.55rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.preset:hover {
+  border-color: var(--verd);
+}
+
+.preset[aria-pressed='true'] {
+  border-color: var(--verd);
+  background: var(--verd-wash);
+}
+
+.preset__name {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.preset__blurb {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* Letterform switches. Each says what it changes, because the names are jargon. */
+
+.alts {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.alt {
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: transparent;
+  padding: 0.42rem 0.55rem 0.48rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.alt:hover {
+  border-color: var(--verd);
+}
+
+.alt[aria-pressed='true'] {
+  border-color: var(--verd);
+  background: var(--verd-wash);
+}
+
+.alt__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.alt[aria-pressed='true'] .alt__label {
+  color: var(--verd);
+}
+
+.alt__label::before {
+  content: '○';
+  margin-right: 0.45em;
+  color: var(--muted);
+}
+
+.alt[aria-pressed='true'] .alt__label::before {
+  content: '●';
+  color: var(--verd);
+}
+
+.alt__note {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Name field */
+
+.field {
+  display: block;
+  margin-bottom: 0.7rem;
+}
+
+.field__label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+.field__input {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper-sunk);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.field__input:focus {
+  border-color: var(--verd);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Narrow
+   --------------------------------------------------------------------------------------------- */
+
+@media (max-width: 60rem) {
+  /* The letters come first, then the controls, then the rest of the sheet. A visitor who has
+     scrolled past nine sliders before seeing a single letter has been shown the wrong thing. */
+  .sheet {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'hero' 'console' 'proof';
+  }
+
+  .console {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    min-height: 0;
+  }
+
+  .console__inner {
+    position: static;
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  }
+
+  .panel {
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .bar__where {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 30rem) {
+  .presets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
