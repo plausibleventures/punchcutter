@@ -92,6 +92,11 @@ const LABEL_GUTTER = 86;
 const LABEL_MIN_GAP = 13;
 const LABELS_FROM = 520;
 
+/** How large the display line may get, and the bounds the box it sits in is held between. */
+const HERO_MAX = 250;
+const HERO_MIN = 168;
+const HERO_MAX_BOX = 340;
+
 export interface HeroOptions {
   text: string;
   caret: number | null;
@@ -110,22 +115,29 @@ export interface HeroOptions {
  * only animation on the page and the only one that says anything.
  */
 export function drawHero(canvas: HTMLCanvasElement, face: Face, pal: Palette, opts: HeroOptions): void {
-  const ctx = prepare(canvas);
-  if (!ctx) return;
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
+  const width = canvas.clientWidth || canvas.parentElement?.clientWidth || 0;
+  if (width <= 0) return;
   const m = face.metrics;
-
   const pad = opts.pad;
   const text = opts.text.length ? opts.text : ' ';
-
-  // The size is chosen so the tallest and deepest ink in the face fits the box, then reduced again
-  // if the line is too long — so the letters never crop, whatever the extender sliders are doing.
   const vertical = Math.max(m.asc, m.cap) + m.desc + UPM * 0.06;
-  const byHeight = ((height - pad * 2) * UPM) / vertical;
   const labelled = width >= LABELS_FROM;
   const column = width - pad * 2 - (labelled ? LABEL_GUTTER : 0);
-  const px = Math.min(byHeight, fit(face, text, column, byHeight));
+
+  // The box follows the letters rather than the letters rattling around in a fixed box. A display
+  // line is almost always limited by how wide it may be, not how tall, so sizing to the width first
+  // and then giving the box exactly the height that needs is not circular — and it closes the strip
+  // of dead canvas that used to sit between the word and whatever came after it.
+  //
+  // The height is quantised before it is applied. Without that, every keystroke and every nudge of
+  // the ascender slider reflows the whole page by a pixel or two, which reads as the layout being
+  // unstable under the hand that is using it.
+  const byWidth = fit(face, text, column, HERO_MAX);
+  const wanted = (vertical * byWidth) / UPM + pad * 1.1;
+  const height = Math.round(Math.max(HERO_MIN, Math.min(HERO_MAX_BOX, wanted)) / 16) * 16;
+  const ctx = prepare(canvas, height);
+  if (!ctx) return;
+  const px = Math.min(byWidth, ((height - pad * 1.1) * UPM) / vertical);
   const scale = px / UPM;
   const inkTop = (Math.max(m.asc, m.cap) + UPM * 0.03) * scale;
   const baseline = (height - vertical * scale) / 2 + inkTop;

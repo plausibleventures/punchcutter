@@ -29,6 +29,11 @@
       <!-- The stage sits directly in the grid rather than inside the proof column, because on a
            narrow screen the letters have to come before the controls and the controls before the
            rest of the sheet — three blocks in three different orders from the one they are in here. -->
+      <!-- The display line and a paragraph of running text share one grid area so they stay
+           together at every width. A big word shows you the letterforms; only a paragraph shows
+           you the colour of the face, which is what a text face is actually judged on, and both
+           have to move under the hand that is dragging the slider. -->
+      <div class="stage">
       <section class="hero" aria-labelledby="hero-label">
         <h2 class="eyebrow" id="hero-label">
           The face<span class="eyebrow__hint">click the letters and type</span>
@@ -47,6 +52,12 @@
           />
         </div>
       </section>
+
+        <section class="block stage__text" aria-labelledby="text-label">
+          <h2 class="eyebrow" id="text-label">In text<span class="eyebrow__hint">set at 17 pixels</span></h2>
+          <canvas class="block__canvas" id="paragraph" role="img" aria-label="A paragraph set in the typeface"></canvas>
+        </section>
+      </div>
 
       <div class="sheet__proof">
         <!-- The lesson. A specimen sheet has always been half catalogue and half argument for the
@@ -89,10 +100,6 @@
           <canvas class="block__canvas" id="anatomy" role="img" aria-label="A diagram naming the parts of a letter"></canvas>
         </section>
 
-        <section class="block" aria-labelledby="text-label">
-          <h2 class="eyebrow" id="text-label">In text<span class="eyebrow__hint">set at 17 pixels</span></h2>
-          <canvas class="block__canvas" id="paragraph" role="img" aria-label="A paragraph set in the typeface"></canvas>
-        </section>
 
         <section class="colophon" aria-labelledby="colophon-label">
           <h2 class="eyebrow" id="colophon-label">How it is drawn</h2>

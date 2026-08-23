@@ -153,9 +153,20 @@ a {
     'proof console';
 }
 
-.hero {
+.stage {
   grid-area: hero;
   min-width: 0;
+}
+
+.hero {
+  min-width: 0;
+}
+
+/* Running text sits directly under the display line, close enough that one glance takes in both. */
+.stage__text {
+  padding-top: clamp(1rem, 2.2vw, 1.6rem);
+  margin-top: clamp(1rem, 2.2vw, 1.6rem);
+  padding-bottom: clamp(1.2rem, 2.5vw, 2rem);
 }
 
 .console {
@@ -195,7 +206,9 @@ a {
 /* The stage. The one place on the page allowed to be loud. */
 
 .hero {
-  padding: clamp(1.5rem, 4vw, 3rem) 0 clamp(1rem, 2.5vw, 2rem);
+  /* No padding underneath: the canvas now ends where the letters do, and the running text below
+     brings its own margin. Two lots of breathing room where one is wanted reads as a gap. */
+  padding: clamp(1.25rem, 3vw, 2.25rem) 0 0;
 }
 
 .hero__stage {
@@ -206,7 +219,8 @@ a {
 .hero__canvas {
   display: block;
   width: 100%;
-  height: clamp(190px, 27vw, 320px);
+  /* A starting height only. The drawing sets it to fit the letters; see `drawHero`. */
+  height: 240px;
   user-select: none;
   -webkit-user-select: none;
 }
