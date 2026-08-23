@@ -40,8 +40,8 @@ function sheet(title: string, d: Design): string {
 }
 
 const cases: Array<{ name: string; design: Design }> = [];
-for (const f of FAMILIES) cases.push({ name: `family: ${f.name}`, design: { family: f.id, params: f.params, alts: f.alts } });
-for (const p of STYLES) cases.push({ name: `${p.family} / ${p.name}`, design: { family: p.family, params: p.params, alts: p.alts } });
+for (const f of FAMILIES) cases.push({ name: `family: ${f.name}`, design: { family: f.id, params: f.params, alts: f.alts, edits: {} } });
+for (const p of STYLES) cases.push({ name: `${p.family} / ${p.name}`, design: { family: p.family, params: p.params, alts: p.alts, edits: {} } });
 
 const corners: Array<[string, Partial<Params>]> = [
   ['round 0', { round: 0 }],
@@ -56,10 +56,10 @@ const corners: Array<[string, Partial<Params>]> = [
   ['wobble 100', { wobble: 1 }],
 ];
 for (const [name, patch] of corners) {
-  cases.push({ name: `corner: ${name}`, design: { family: START.family, params: { ...START.params, ...patch }, alts: [] } });
+  cases.push({ name: `corner: ${name}`, design: { family: START.family, params: { ...START.params, ...patch }, alts: [], edits: {} } });
 }
-cases.push({ name: 'corner: mono heavy', design: { family: 'mono', params: { ...START.params, weight: 160, serif: 0.8 }, alts: [...ALT_KEYS] } });
-cases.push({ name: 'corner: mono thin', design: { family: 'mono', params: { ...START.params, weight: 24 }, alts: [...ALT_KEYS] } });
+cases.push({ name: 'corner: mono heavy', design: { family: 'mono', params: { ...START.params, weight: 160, serif: 0.8 }, alts: [...ALT_KEYS], edits: {} } });
+cases.push({ name: 'corner: mono thin', design: { family: 'mono', params: { ...START.params, weight: 24 }, alts: [...ALT_KEYS], edits: {} } });
 
 /**
  * One line per case, stacked.

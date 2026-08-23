@@ -141,7 +141,7 @@ const TARGETS: Target[] = [
 const PX = 54;
 
 function drawMine(t: Target): HTMLCanvasElement {
-  const design: Design = { family: t.family, params: { ...DEFAULTS, ...t.params }, alts: t.alts };
+  const design: Design = { family: t.family, params: { ...DEFAULTS, ...t.params }, alts: t.alts, edits: {} };
   const face = buildFace(design);
   const line = setLine(face, SPECIMEN);
   const scale = PX / UPM;

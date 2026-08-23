@@ -602,15 +602,110 @@ export function familyOf(id: FamilyId): Family {
   return FAMILIES.find((f) => f.id === id) ?? FAMILIES[0]!;
 }
 
-/** A complete design: which genre, which letterforms, and where in the space. */
+/**
+ * What has been changed about one character, on its own.
+ *
+ * Global axes can only ever produce a *coherent* typeface, never a good one. Real faces are tuned
+ * letter by letter — this `g` a shade narrower, that `t` a shade taller, the `f` given more room on
+ * its left — and no number of sliders that move all hundred and seventy characters at once will
+ * substitute for it. This is where that judgement goes.
+ *
+ * Every field is a *relative* adjustment rather than an absolute value, and that is the whole trick
+ * for making hand tuning survive a parametric base. A width of 0.94 means "six per cent narrower
+ * than this letter would otherwise be", so it still means the right thing after the weight axis has
+ * moved and the letter has been redrawn around it. Absolute values would have to be re-tuned every
+ * time anything else changed, which is the failure mode that makes most parametric tools a toy.
+ */
+export interface GlyphEdit {
+  /** Multiplier on the counter width. */
+  width?: number;
+  /** Multiplier on the stroke. */
+  weight?: number;
+  /** Multipliers on the vertical metrics. */
+  xheight?: number;
+  ascend?: number;
+  descend?: number;
+  /** Absolute override of roundness, which is already a 0..1 quantity. */
+  round?: number;
+  /** Extra degrees of shear, on top of the face's own slant. */
+  slant?: number;
+  /** Extra space on each side, in units. Negative tightens. */
+  lsb?: number;
+  rsb?: number;
+}
+
+export type Edits = Record<string, GlyphEdit>;
+
+/** The per-glyph controls, in the order the inspector shows them. */
+export interface GlyphAxis {
+  key: keyof GlyphEdit;
+  label: string;
+  note: string;
+  min: number;
+  max: number;
+  step: number;
+  /** What "unchanged" means for this control. */
+  base: number;
+  unit: 'multiplier' | 'units' | 'degrees' | 'percent';
+}
+
+export const GLYPH_AXES: GlyphAxis[] = [
+  { key: 'width', label: 'Width', note: 'Narrower or wider than the face would make it.', min: 0.5, max: 1.8, step: 0.01, base: 1, unit: 'multiplier' },
+  { key: 'weight', label: 'Weight', note: 'Lighter or heavier, for a letter that reads too dark or too pale.', min: 0.55, max: 1.6, step: 0.01, base: 1, unit: 'multiplier' },
+  { key: 'lsb', label: 'Left side', note: 'Space before the letter. The other half of spacing a face by eye.', min: -120, max: 160, step: 1, base: 0, unit: 'units' },
+  { key: 'rsb', label: 'Right side', note: 'Space after it.', min: -120, max: 160, step: 1, base: 0, unit: 'units' },
+  { key: 'xheight', label: 'x-height', note: 'Overshoot a round letter, or shorten one that sits too tall.', min: 0.85, max: 1.15, step: 0.005, base: 1, unit: 'multiplier' },
+  { key: 'ascend', label: 'Ascender', note: 'How far this letter reaches above the cap line.', min: 0.8, max: 1.3, step: 0.005, base: 1, unit: 'multiplier' },
+  { key: 'descend', label: 'Descender', note: 'How far it hangs below the baseline.', min: 0.6, max: 1.6, step: 0.01, base: 1, unit: 'multiplier' },
+  { key: 'round', label: 'Roundness', note: 'Square this one letter off, or round it, on its own.', min: 0, max: 1, step: 0.01, base: -1, unit: 'percent' },
+  { key: 'slant', label: 'Slant', note: 'Lean this letter further than the rest.', min: -12, max: 12, step: 0.5, base: 0, unit: 'degrees' },
+];
+
+/** Whether a glyph has been touched at all. */
+export function isEdited(e: GlyphEdit | undefined): boolean {
+  if (!e) return false;
+  return GLYPH_AXES.some((a) => {
+    const v = e[a.key];
+    return v !== undefined && (a.base < 0 || Math.abs(v - a.base) > 1e-9);
+  });
+}
+
+/** A complete design: which genre, which letterforms, where in the space, and what was hand-tuned. */
 export interface Design {
   family: FamilyId;
   params: Params;
   /** Which alternate constructions are switched on. Order does not matter. */
   alts: AltKey[];
+  /** Per-character adjustments, keyed by the character itself. Absent means untouched. */
+  edits: Edits;
 }
 
-export const START: Design = { family: 'sans', params: { ...DEFAULTS }, alts: [] };
+export const START: Design = { family: 'sans', params: { ...DEFAULTS }, alts: [], edits: {} };
+
+/**
+ * The metrics one character is drawn with, once its own adjustments are folded in.
+ *
+ * Everything downstream — the frame the glyph is laid out in, the pen, the serifs, the kerning —
+ * reads `Metrics`, so bending them here is enough to make a per-glyph change reach every part of
+ * the drawing without a single one of them knowing that per-glyph changes exist.
+ */
+export function metricsFor(m: Metrics, e: GlyphEdit | undefined): Metrics {
+  if (!e) return m;
+  const w = m.w * (e.weight ?? 1);
+  const xh = Math.round(m.xh * (e.xheight ?? 1));
+  return {
+    ...m,
+    w,
+    h: w / 2,
+    xh,
+    asc: Math.round(m.asc * (e.ascend ?? 1)),
+    desc: Math.round(m.desc * (e.descend ?? 1)),
+    over: Math.round(CAP * 0.012 + w * 0.045),
+    width: m.width * (e.width ?? 1),
+    round: e.round ?? m.round,
+    tan: Math.tan(((Math.atan(m.tan) * 180) / Math.PI + (e.slant ?? 0)) * (Math.PI / 180)),
+  };
+}
 
 /**
  * Alternates pack into the link as a bitmask.
@@ -777,28 +872,100 @@ export function decodeParams(s: string): Params | null {
  * back to sans and returning finds the serif exactly where it was left. A shorter link that forgot
  * the hidden axes would be a link that quietly loses work.
  */
-export function encodeDesign(d: Design): string {
-  const i = FAMILIES.findIndex((f) => f.id === d.family);
-  return Math.max(0, i).toString(RADIX) + encodeParams(d.params) + encodeAlts(d.alts);
+/**
+ * The hand tuning, packed tight enough to still fit in a link.
+ *
+ * The whole design living in the address bar is the best property this tool has — no account, no
+ * save button, no file to lose — and per-character tuning is exactly the kind of feature that
+ * usually kills it. So each edited character costs one character for itself, two for a bitmask of
+ * which of its nine controls were touched, and two per touched control. A dozen tuned letters is
+ * well under two hundred characters; every letter in the font tuned on every axis is under four
+ * thousand, which a URL still carries.
+ *
+ * No separators: the mask says how many values follow, so the next character begins immediately
+ * after them.
+ */
+function encodeEdits(edits: Edits): string {
+  let out = '';
+  for (const ch of Object.keys(edits ?? {}).sort()) {
+    const e = edits[ch]!;
+    let mask = 0;
+    let values = '';
+    GLYPH_AXES.forEach((a, i) => {
+      const v = e[a.key];
+      if (v === undefined) return;
+      mask |= 1 << i;
+      const t = (v - a.min) / (a.max - a.min);
+      values += Math.max(0, Math.min(SLOTS, Math.round(t * SLOTS)))
+        .toString(RADIX)
+        .padStart(2, '0');
+    });
+    if (mask) out += ch + mask.toString(RADIX).padStart(2, '0') + values;
+  }
+  return out;
 }
 
-export function decodeDesign(s: string): Design | null {
+function decodeEdits(s: string): Edits {
+  const out: Edits = {};
+  const chars = [...s];
+  let i = 0;
+  while (i < chars.length) {
+    const ch = chars[i]!;
+    const mask = parseInt(chars.slice(i + 1, i + 3).join(''), RADIX);
+    i += 3;
+    if (!Number.isFinite(mask)) break;
+    const edit: GlyphEdit = {};
+    for (let bit = 0; bit < GLYPH_AXES.length; bit++) {
+      if (!((mask >> bit) & 1)) continue;
+      const a = GLYPH_AXES[bit]!;
+      const n = parseInt(chars.slice(i, i + 2).join(''), RADIX);
+      i += 2;
+      if (!Number.isFinite(n)) return out;
+      const v = a.min + (n / SLOTS) * (a.max - a.min);
+      edit[a.key] = Math.round(v / a.step) * a.step;
+    }
+    out[ch] = edit;
+  }
+  return out;
+}
+
+export function encodeDesign(d: Design): string {
+  const i = FAMILIES.findIndex((f) => f.id === d.family);
+  const base = Math.max(0, i).toString(RADIX) + encodeParams(d.params) + encodeAlts(d.alts);
+  const tuned = encodeEdits(d.edits);
+  return tuned ? `${base}.${tuned}` : base;
+}
+
+export function decodeDesign(raw: string): Design | null {
+  // The tuning is split off before anything is lower-cased: an edited `G` and an edited `g` are
+  // different letters, and folding the case would silently move one on to the other.
+  const dot = raw.indexOf('.');
+  const edits = dot >= 0 ? decodeEdits(raw.slice(dot + 1)) : {};
+  const s = dot >= 0 ? raw.slice(0, dot) : raw;
   const clean = s.trim().toLowerCase();
   if (clean.length < 1 + AXES.length * 2) {
     // A design from before the families existed is axes and no prefix. Read it as a sans rather
     // than dropping it: those links were handed out.
     const legacy = decodeParams(clean);
-    return legacy ? { family: 'sans', params: legacy, alts: [] } : null;
+    return legacy ? { family: 'sans', params: legacy, alts: [], edits } : null;
   }
   const family = FAMILIES[parseInt(clean[0]!, RADIX)]?.id ?? 'sans';
   const params = decodeParams(clean.slice(1, 1 + AXES.length * 2));
   if (!params) return null;
-  return { family, params, alts: decodeAlts(clean.slice(1 + AXES.length * 2)) };
+  return { family, params, alts: decodeAlts(clean.slice(1 + AXES.length * 2)), edits };
 }
 
 /** A stable fingerprint, used to decide whether cached outlines are still good. */
 export function designKey(d: Design): string {
-  return `${d.family}:${encodeAlts(d.alts)}:` + AXES.map((a) => d.params[a.key].toFixed(4)).join(',');
+  const edits = Object.keys(d.edits ?? {})
+    .sort()
+    .map((ch) => ch + JSON.stringify(d.edits[ch]))
+    .join('');
+  return (
+    `${d.family}:${encodeAlts(d.alts)}:` +
+    AXES.map((a) => d.params[a.key].toFixed(4)).join(',') +
+    (edits ? '|' + edits : '')
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

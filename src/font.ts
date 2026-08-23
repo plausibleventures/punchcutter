@@ -24,9 +24,11 @@ import {
   designKey,
   type AltKey,
   familyOf,
+  metricsFor,
   metricsOf,
   UPM,
   type Design,
+  type GlyphEdit,
   type Metrics,
 } from './params';
 
@@ -80,7 +82,11 @@ const SIDEBEARING = 0.32;
  * width the letter actually ends up with, and the shear comes last of all, because shearing before
  * stretching would change the angle of the slant.
  */
-function drawGlyph(ch: string, m: Metrics, alts: readonly AltKey[]): DrawnGlyph | null {
+function drawGlyph(ch: string, base: Metrics, alts: readonly AltKey[], edit?: GlyphEdit): DrawnGlyph | null {
+  // Everything below reads `m`, so folding the character's own adjustments in here is enough to
+  // make them reach the frame, the pen, the serifs and the spacing without any of those knowing
+  // that per-character adjustments exist at all.
+  const m = metricsFor(base, edit);
   const g = buildGlyph(ch, m, alts);
   if (!g) return null;
   const pen: Pen = {
@@ -108,12 +114,16 @@ function drawGlyph(ch: string, m: Metrics, alts: readonly AltKey[]): DrawnGlyph 
   // In a monospaced face the advance is decided first and the letter is centred in it; everywhere
   // else the letter is drawn and the advance follows from it. That is the whole difference.
   let side = m.w * m.xscale * g.sb * SIDEBEARING + m.track / 2;
-  let advance = outer + side * 2;
+  let left = side + (edit?.lsb ?? 0);
+  let advance = outer + side * 2 + (edit?.lsb ?? 0) + (edit?.rsb ?? 0);
   if (m.mono) {
+    // A monospaced face keeps its slot whatever a character asks for; hand tuning there moves the
+    // letter within its slot rather than changing how much room it takes, or the columns stop
+    // lining up and the face stops being monospaced.
     advance = monoSlot(m);
-    side = (advance - outer) / 2;
+    left = (advance - outer) / 2 + (edit?.lsb ?? 0) - (edit?.rsb ?? 0);
   }
-  contours = translateContours(contours, side, 0);
+  contours = translateContours(contours, left, 0);
   if (Math.abs(m.tan) > 1e-9) {
     contours = shearContours(translateContours(contours, 0, -SHEAR_PIVOT), m.tan);
     contours = translateContours(contours, 0, SHEAR_PIVOT);
@@ -142,7 +152,7 @@ export function buildFace(design: Design): Face {
   const m = metricsOf(design.params, familyOf(design.family).mono ?? false);
   const glyphs = new Map<string, DrawnGlyph>();
   for (const ch of CHARSET) {
-    const g = drawGlyph(ch, m, design.alts);
+    const g = drawGlyph(ch, m, design.alts, design.edits[ch]);
     if (g) glyphs.set(ch, g);
   }
 

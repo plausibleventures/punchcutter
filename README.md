@@ -38,6 +38,30 @@ they compose with a two-storey `a` without either knowing about the other.
 `l`, a slashed zero and a straight-armed `r`, which is a different design from the same family in
 *Geometric*, not a different weight of it.
 
+## Tuning one letter at a time
+
+Global axes can only ever produce a *coherent* typeface, never a good one. Real faces are made letter
+by letter — this `g` a shade narrower, that `t` a shade taller, the `f` given more room on its left —
+and no number of sliders that move all 171 characters at once substitutes for it.
+
+Click any character in the character set and it opens on its own, drawn at a size you can judge it
+at, with its metrics and **its sidebearings** marked: half of what makes a face good is spacing, and
+spacing is invisible until something shows where it starts and stops. Nine controls then apply to
+that character alone — width, weight, both side spaces, x-height, ascender, descender, roundness and
+slant.
+
+Every one is **relative**, and that is the whole trick for making hand tuning survive a parametric
+base. A width of 94% means "narrower than this letter would otherwise be", so it still means the
+right thing after the weight axis has moved and the letter has been redrawn around it. Absolute
+values would need re-tuning every time anything else changed, which is what makes most parametric
+tools a toy.
+
+Two things fall out of the architecture for free. Kerning is *measured* rather than tabled, so
+widening a letter by hand immediately re-kerns every pair it appears in. And the whole thing still
+fits in the link: each tuned character costs one character for itself, two for a bitmask of which
+controls were touched, and two per touched control — a dozen tuned letters is under two hundred
+characters. Work is also autosaved locally, because a link is only a save for somebody who copied it.
+
 ## The axes
 
 | Axis | What it does | Families |

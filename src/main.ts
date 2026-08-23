@@ -12,22 +12,28 @@ import { ALTERNATES, CHARSET } from './glyphs';
 import {
   AXES,
   FAMILIES,
+  GLYPH_AXES,
   STYLES,
   START,
   clampParams,
   decodeDesign,
   encodeDesign,
   familyOf,
+  isEdited,
   suggestName,
   type AltKey,
   type Axis,
   type Design,
+  type GlyphAxis,
+  type GlyphEdit,
   type FamilyId,
   type Params,
 } from './params';
 import {
   caretAt,
+  caseHit,
   drawCharset,
+  drawGlyphStudy,
   drawHero,
   drawAnatomy,
   drawParagraph,
@@ -44,12 +50,14 @@ const PARAGRAPH =
   'about the job was parametric, and the letters still had to be looked at. So do these.';
 
 const state = {
-  design: { family: START.family, params: { ...START.params }, alts: [...START.alts] } as Design,
+  design: { family: START.family, params: { ...START.params }, alts: [...START.alts], edits: {} } as Design,
   text: 'Punchcutter',
   caret: null as number | null,
   name: '',
   /** The axis under the pointer, so the hero can light the rule that answers to it. */
   live: null as keyof Params | null,
+  /** Which character the inspector is pointed at, if any. */
+  picked: null as string | null,
 };
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -60,6 +68,7 @@ const waterfall = el<HTMLCanvasElement>('waterfall');
 const charset = el<HTMLCanvasElement>('charset');
 const paragraph = el<HTMLCanvasElement>('paragraph');
 const anatomy = el<HTMLCanvasElement>('anatomy');
+const glyphCanvas = el<HTMLCanvasElement>('glyph');
 const nameField = el<HTMLInputElement>('fontname');
 const status = el<HTMLParagraphElement>('status');
 
@@ -95,8 +104,9 @@ function render(): void {
     hero.setAttribute('aria-label', `${state.text || 'The specimen'}, set in the typeface you are drawing`);
     drawHero(hero, face, palette, { text: state.text, caret: state.caret, live: state.live, pad });
     drawWaterfall(waterfall, face, palette, state.text || 'Hamburgefonstiv', pad);
-    drawCharset(charset, face, palette, CHARSET, pad);
+    drawCharset(charset, face, palette, CHARSET, pad, state.picked, (ch) => isEdited(state.design.edits[ch]));
     drawAnatomy(anatomy, face, palette, pad);
+    if (state.picked) drawGlyphStudy(glyphCanvas, face, palette, state.picked, pad);
     drawParagraph(paragraph, face, palette, PARAGRAPH, 17, pad);
   });
 }
@@ -154,7 +164,7 @@ function buildFamilies(): void {
  */
 function pickFamily(id: FamilyId): void {
   const f = familyOf(id);
-  state.design = { family: id, params: { ...f.params }, alts: [...f.alts] };
+  state.design = { family: id, params: { ...f.params }, alts: [...f.alts], edits: {} };
   state.name = '';
   nameField.value = '';
   syncConsole();
@@ -227,7 +237,7 @@ function buildConsole(): void {
     b.addEventListener('click', () => {
       state.name = '';
       nameField.value = '';
-      state.design = { family: p.family, params: clampParams(p.params), alts: [...p.alts] };
+      state.design = { family: p.family, params: clampParams(p.params), alts: [...p.alts], edits: {} };
       syncConsole();
       writeHash();
       render();
@@ -292,11 +302,34 @@ function syncConsole(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>('.preset')) {
     const p = STYLES.find((x) => `${x.family}/${x.name}` === b.dataset.preset);
     b.hidden = !p || p.family !== state.design.family;
-    const same = p && encodeDesign({ family: p.family, params: clampParams(p.params), alts: p.alts }) === code;
+    const same = p && encodeDesign({ family: p.family, params: clampParams(p.params), alts: p.alts, edits: {} }) === code;
     b.setAttribute('aria-pressed', String(!!same));
   }
   for (const b of document.querySelectorAll<HTMLButtonElement>('.alt')) {
     b.setAttribute('aria-pressed', String(state.design.alts.includes(b.dataset.alt as AltKey)));
+  }
+
+  // How much hand tuning is in this face, and the only way to take it all back out. Per-glyph work
+  // is easy to forget about and expensive to lose, so it says so rather than hiding in the case.
+  const tuned = Object.keys(state.design.edits).filter((ch) => isEdited(state.design.edits[ch]));
+  const note = el('tuned-note');
+  note.hidden = tuned.length === 0;
+  if (tuned.length) {
+    note.textContent = `${tuned.length} ${tuned.length === 1 ? 'letter' : 'letters'} tuned by hand — ${tuned
+      .slice(0, 12)
+      .join(' ')}${tuned.length > 12 ? '…' : ''}. `;
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'linkish';
+    clear.textContent = 'Clear all';
+    clear.addEventListener('click', () => {
+      state.design = { ...state.design, edits: {} };
+      syncConsole();
+      syncInspector();
+      writeHash();
+      render();
+    });
+    note.append(clear);
   }
 
   el('lesson-name').textContent = family.name;
@@ -304,6 +337,128 @@ function syncConsole(): void {
   el('lesson-text').textContent = family.lesson;
   el('lesson-good').textContent = family.good;
   nameField.placeholder = suggestName(state.design.params, state.design.family);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The inspector: one character at a time
+// ---------------------------------------------------------------------------------------------
+
+interface GlyphRow {
+  root: HTMLElement;
+  input: HTMLInputElement;
+  value: HTMLElement;
+}
+
+const glyphRows = new Map<keyof GlyphEdit, GlyphRow>();
+
+/** What a per-glyph control reads as. Multipliers are shown as percentages of the face's own. */
+function formatGlyph(axis: GlyphAxis, v: number): string {
+  switch (axis.unit) {
+    case 'multiplier':
+      return `${Math.round(v * 100)}%`;
+    case 'percent':
+      return `${Math.round(v * 100)}%`;
+    case 'degrees':
+      return `${v > 0 ? '+' : ''}${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}°`;
+    case 'units':
+      return `${v > 0 ? '+' : ''}${Math.round(v)}`;
+  }
+}
+
+function buildInspector(): void {
+  const box = el('glyph-axes');
+  for (const axis of GLYPH_AXES) {
+    const root = document.createElement('div');
+    root.className = 'axis';
+
+    const name = document.createElement('span');
+    name.className = 'axis__name';
+    name.textContent = axis.label;
+
+    const value = document.createElement('span');
+    value.className = 'axis__value';
+
+    const input = document.createElement('input');
+    input.className = 'axis__slider';
+    input.type = 'range';
+    input.min = String(axis.min);
+    input.max = String(axis.max);
+    input.step = String(axis.step);
+    input.setAttribute('aria-label', `${axis.label} of the selected character. ${axis.note}`);
+
+    const note = document.createElement('p');
+    note.className = 'axis__note';
+    note.textContent = axis.note;
+
+    input.addEventListener('input', () => setGlyph(axis.key, Number(input.value)));
+    root.append(name, value, input, note);
+    box.append(root);
+    glyphRows.set(axis.key, { root, input, value });
+  }
+
+  // The case doubles as the way in. Clicking a letter there is the most direct thing a person can
+  // do to say "this one", and it needs no explaining.
+  charset.addEventListener('click', (e) => {
+    const hit = caseHit(charset, CHARSET, gutter(), e.clientX, e.clientY);
+    pick(hit === state.picked ? null : hit);
+  });
+
+  el('glyph-reset').addEventListener('click', () => {
+    if (!state.picked) return;
+    const next = { ...state.design.edits };
+    delete next[state.picked];
+    state.design = { ...state.design, edits: next };
+    syncInspector();
+    writeHash();
+    render();
+  });
+  el('glyph-close').addEventListener('click', () => pick(null));
+}
+
+function pick(ch: string | null): void {
+  state.picked = ch;
+  syncInspector();
+  render();
+  if (ch) el('glyph-block').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function setGlyph(key: keyof GlyphEdit, v: number): void {
+  const ch = state.picked;
+  if (!ch) return;
+  const edits = { ...state.design.edits, [ch]: { ...state.design.edits[ch], [key]: v } };
+  state.design = { ...state.design, edits };
+  syncInspector();
+  writeHash();
+  render();
+}
+
+function syncInspector(): void {
+  const ch = state.picked;
+  const panel = el('glyph-panel');
+  const block = el('glyph-block');
+  panel.hidden = ch === null;
+  block.hidden = ch === null;
+  if (!ch) return;
+
+  const edit = state.design.edits[ch] ?? {};
+  const named = ch === ' ' ? 'space' : ch;
+  el('glyph-panel-title').textContent = `The letter ${named}`;
+  el('glyph-title').textContent = `Glyph ${named}`;
+  const touched = isEdited(edit);
+  const stateLabel = el('glyph-panel-state');
+  stateLabel.textContent = touched ? 'tuned' : 'as the face draws it';
+  stateLabel.classList.toggle('eyebrow__hint--edited', touched);
+
+  for (const axis of GLYPH_AXES) {
+    const row = glyphRows.get(axis.key)!;
+    // Roundness has no natural "unchanged" multiplier, so an untouched glyph shows the face's own
+    // value and only becomes an override once it is moved.
+    const fallback = axis.base < 0 ? state.design.params.round : axis.base;
+    const v = edit[axis.key] ?? fallback;
+    if (document.activeElement !== row.input) row.input.value = String(v);
+    row.value.textContent = formatGlyph(axis, v);
+    row.value.style.opacity = edit[axis.key] === undefined ? '0.45' : '1';
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -317,6 +472,8 @@ function set(patch: Partial<Params>): void {
   render();
 }
 
+const AUTOSAVE = 'punchcutter.design';
+
 let hashTimer = 0;
 function writeHash(): void {
   // The address bar is written on a delay: a slider drag fires a hundred times a second and every
@@ -327,13 +484,29 @@ function writeHash(): void {
     q.set('f', encodeDesign(state.design));
     if (state.name.trim()) q.set('n', state.name.trim());
     if (state.text !== 'Punchcutter') q.set('t', state.text);
-    history.replaceState(null, '', `#${q.toString()}`);
+    const hash = `#${q.toString()}`;
+    history.replaceState(null, '', hash);
+    // The address bar is a save only for somebody who copied it. Hand tuning is hours of work that
+    // a reload would otherwise take with it, so it is kept locally as well.
+    try {
+      localStorage.setItem(AUTOSAVE, hash.slice(1));
+    } catch {
+      // Private windows and blocked storage are not worth interrupting anybody over.
+    }
   }, 220);
 }
 
 function readHash(): void {
-  const raw = location.hash.replace(/^#/, '');
-  if (!raw) return;
+  let raw = location.hash.replace(/^#/, '');
+  if (!raw) {
+    // Nothing in the link: pick up where this browser left off, if it left off anywhere.
+    try {
+      raw = localStorage.getItem(AUTOSAVE) ?? '';
+    } catch {
+      raw = '';
+    }
+    if (!raw) return;
+  }
   const q = new URLSearchParams(raw);
   const d = decodeDesign(q.get('f') ?? '');
   if (d) state.design = d;
@@ -498,9 +671,11 @@ function surprise(): void {
 
 buildFamilies();
 buildConsole();
+buildInspector();
 readHash();
 capture.value = state.text;
 syncConsole();
+syncInspector();
 wireTyping();
 
 el('charset-count').textContent = `${CHARSET.length - 1} characters, all of them drawn`;

@@ -15,12 +15,12 @@ import { ALT_KEYS, FAMILIES, STYLES, START, type Design, type Params } from './p
 
 const corner = (name: string, patch: Partial<Params>): { name: string; design: Design } => ({
   name,
-  design: { family: START.family, params: { ...START.params, ...patch }, alts: [] },
+  design: { family: START.family, params: { ...START.params, ...patch }, alts: [], edits: {} },
 });
 
 export const CASES: Array<{ name: string; design: Design }> = [
-  ...FAMILIES.map((f) => ({ name: `family-${f.id}`, design: { family: f.id, params: f.params, alts: f.alts } })),
-  ...STYLES.map((p) => ({ name: `${p.family}-${p.name}`, design: { family: p.family, params: p.params, alts: p.alts } })),
+  ...FAMILIES.map((f) => ({ name: `family-${f.id}`, design: { family: f.id, params: f.params, alts: f.alts, edits: {} } })),
+  ...STYLES.map((p) => ({ name: `${p.family}-${p.name}`, design: { family: p.family, params: p.params, alts: p.alts, edits: {} } })),
   corner('thinnest', { weight: 20 }),
   corner('heaviest', { weight: 190 }),
   corner('heaviest-narrow', { weight: 190, width: 0.6 }),
@@ -44,13 +44,13 @@ export const CASES: Array<{ name: string; design: Design }> = [
   corner('serif-square', { serif: 1, bracket: 0, round: 0 }),
   corner('wobble-max', { wobble: 1 }),
   corner('wobble-max-heavy', { wobble: 1, weight: 190 }),
-  { name: 'mono-heaviest', design: { family: 'mono', params: { ...START.params, weight: 190, serif: 1 }, alts: [] } },
-  { name: 'mono-thinnest', design: { family: 'mono', params: { ...START.params, weight: 20 }, alts: [] } },
-  { name: 'mono-narrow', design: { family: 'mono', params: { ...START.params, width: 0.6, weight: 150 }, alts: [] } },
-  { name: 'hand-heavy-slant', design: { family: 'hand', params: { ...START.params, wobble: 1, weight: 170, slant: 26 }, alts: [] } },
-  { name: 'serif-everything', design: { family: 'serif', params: { ...START.params, serif: 1, bracket: 1, contrast: 1, weight: 190, width: 1.6 }, alts: [] } },
+  { name: 'mono-heaviest', design: { family: 'mono', params: { ...START.params, weight: 190, serif: 1 }, alts: [], edits: {} } },
+  { name: 'mono-thinnest', design: { family: 'mono', params: { ...START.params, weight: 20 }, alts: [], edits: {} } },
+  { name: 'mono-narrow', design: { family: 'mono', params: { ...START.params, width: 0.6, weight: 150 }, alts: [], edits: {} } },
+  { name: 'hand-heavy-slant', design: { family: 'hand', params: { ...START.params, wobble: 1, weight: 170, slant: 26 }, alts: [], edits: {} } },
+  { name: 'serif-everything', design: { family: 'serif', params: { ...START.params, serif: 1, bracket: 1, contrast: 1, weight: 190, width: 1.6 }, alts: [], edits: {} } },
   {
     name: 'all-alternates',
-    design: { family: 'sans', params: { ...START.params }, alts: [...ALT_KEYS] },
+    design: { family: 'sans', params: { ...START.params }, alts: [...ALT_KEYS], edits: {} },
   },
 ];

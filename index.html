@@ -6,7 +6,7 @@
     <title>Punchcutter — draw a typeface, download the font</title>
     <meta
       name="description"
-      content="A parametric type foundry in the browser. Pick a family — sans, serif, mono or handwritten — move the sliders, and download a real .ttf you can install. Nothing leaves your machine."
+      content="A parametric type foundry in the browser. Pick a family — sans, serif, mono or handwritten — move the sliders, tune individual letters by hand, and download a real .ttf you can install. Nothing leaves your machine."
     />
     <meta name="theme-color" content="#edefec" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#101312" media="(prefers-color-scheme: dark)" />
@@ -67,6 +67,14 @@
           <canvas class="block__canvas" id="waterfall" role="img" aria-label="The specimen line set at descending sizes"></canvas>
         </section>
 
+        <section class="block" id="glyph-block" aria-labelledby="glyph-label" hidden>
+          <h2 class="eyebrow" id="glyph-label">
+            <span id="glyph-title">Glyph</span>
+            <span class="eyebrow__hint">its own metrics, and the space either side of it</span>
+          </h2>
+          <canvas class="block__canvas" id="glyph" role="img" aria-label="The selected character on its own"></canvas>
+        </section>
+
         <section class="block" aria-labelledby="charset-label">
           <h2 class="eyebrow" id="charset-label">
             Character set<span class="eyebrow__hint" id="charset-count"></span>
@@ -124,6 +132,15 @@
               thing patched back into the header, and the same outlines you have been looking at. There is no server,
               no account, and no upload. A face you do not want anybody to see never goes anywhere.
             </p>
+            <p>
+              Sliders can only make a face that is <em>consistent</em>. What makes one good is the
+              part that is judgement rather than rule: this letter a shade narrower, that one given
+              more room on its left. Click any character in the set above and it opens on its own,
+              with nine controls that apply to it alone. They are all relative — 94% means narrower
+              than this letter would otherwise be — so the tuning survives moving the sliders it was
+              done against. Because the spacing between letters is measured rather than looked up,
+              widening one by hand re-kerns every pair it appears in, immediately.
+            </p>
             <p class="colophon__note">
               Everything you make with it is yours, with no conditions. It is one of the
               <a href="https://plausible.ventures">Plausible Ventures</a>.
@@ -154,6 +171,23 @@
             <div class="presets" id="presets"></div>
           </section>
 
+          <section class="panel" id="glyph-panel" hidden>
+            <h2 class="eyebrow">
+              <span id="glyph-panel-title">This glyph</span>
+              <span class="eyebrow__hint" id="glyph-panel-state"></span>
+            </h2>
+            <p class="panel__note panel__note--lead">
+              Adjustments to one character only. Every one is relative — a width of 94% means
+              narrower than this letter would otherwise be — so hand tuning survives moving the
+              sliders above it.
+            </p>
+            <div class="axes" id="glyph-axes"></div>
+            <div class="axes__foot">
+              <button class="ghost" type="button" id="glyph-reset">Reset glyph</button>
+              <button class="ghost" type="button" id="glyph-close">Done</button>
+            </div>
+          </section>
+
           <section class="panel">
             <h2 class="eyebrow">Letterforms<span class="eyebrow__hint">swap the shapes themselves</span></h2>
             <p class="panel__note panel__note--lead">
@@ -172,7 +206,8 @@
             </label>
             <button class="solid" type="button" id="download">Download .ttf</button>
             <button class="ghost ghost--wide" type="button" id="share">Copy link to this face</button>
-            <p class="panel__note" id="status">The link carries the family and every axis, shown or not.</p>
+            <p class="panel__note" id="status">The link carries the family, every axis and every letter you have tuned.</p>
+            <p class="panel__note" id="tuned-note" hidden></p>
           </section>
         </div>
       </aside>

@@ -383,20 +383,54 @@ export function drawWaterfall(canvas: HTMLCanvasElement, face: Face, pal: Palett
  * compartment per character, every compartment the same size, so the eye can run the rows and catch
  * the one letter that has gone wrong at this setting.
  */
+/** Where each compartment of the case sits. Shared so a click lands on the letter it looks like. */
+export interface CaseLayout {
+  cell: number;
+  cellH: number;
+  cols: number;
+  rows: number;
+  visible: string[];
+  pad: number;
+}
+
+export function caseLayout(canvas: HTMLCanvasElement, chars: string[], pad: number): CaseLayout | null {
+  const width = (canvas.clientWidth || canvas.parentElement?.clientWidth || 0) - pad * 2;
+  if (width <= 0) return null;
+  const cell = width / Math.max(6, Math.round(width / 62));
+  const cols = Math.max(1, Math.floor(width / cell + 0.001));
+  const visible = chars.filter((c) => c !== ' ');
+  return { cell, cellH: cell * 1.12, cols, rows: Math.ceil(visible.length / cols), visible, pad };
+}
+
+/** Which character was clicked, or null for a click in the margin. */
+export function caseHit(
+  canvas: HTMLCanvasElement,
+  chars: string[],
+  pad: number,
+  clientX: number,
+  clientY: number,
+): string | null {
+  const l = caseLayout(canvas, chars, pad);
+  if (!l) return null;
+  const rect = canvas.getBoundingClientRect();
+  const col = Math.floor((clientX - rect.left - pad) / l.cell);
+  const row = Math.floor((clientY - rect.top) / l.cellH);
+  if (col < 0 || col >= l.cols || row < 0 || row >= l.rows) return null;
+  return l.visible[row * l.cols + col] ?? null;
+}
+
 export function drawCharset(
   canvas: HTMLCanvasElement,
   face: Face,
   pal: Palette,
   chars: string[],
   pad: number,
+  selected: string | null = null,
+  edited: (ch: string) => boolean = () => false,
 ): void {
-  const width = (canvas.clientWidth || canvas.parentElement?.clientWidth || 0) - pad * 2;
-  if (width <= 0) return;
-  const cell = width / Math.max(6, Math.round(width / 62));
-  const cols = Math.max(1, Math.floor(width / cell + 0.001));
-  const visible = chars.filter((c) => c !== ' ');
-  const rows = Math.ceil(visible.length / cols);
-  const cellH = cell * 1.12;
+  const l = caseLayout(canvas, chars, pad);
+  if (!l) return;
+  const { cell, cellH, cols, rows, visible } = l;
   const ctx = prepare(canvas, Math.ceil(rows * cellH) + 1);
   if (!ctx) return;
 
@@ -421,6 +455,28 @@ export function drawCharset(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
+  // A tuned letter is marked in the case rather than only in the panel, so the work already done on
+  // a face is visible at a glance instead of having to be remembered.
+  visible.forEach((ch, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const box = { x: pad + col * cell, y: row * cellH };
+    if (ch === selected) {
+      ctx.fillStyle = pal.verd;
+      ctx.globalAlpha = 0.16;
+      ctx.fillRect(box.x, box.y, cell, cellH);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = pal.verd;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(Math.round(box.x) + 0.5, Math.round(box.y) + 0.5, cell - 1, cellH - 1);
+    } else if (edited(ch)) {
+      ctx.fillStyle = pal.verd;
+      ctx.beginPath();
+      ctx.arc(box.x + cell - 7, box.y + 7, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+
   ctx.fillStyle = pal.ink;
   visible.forEach((ch, i) => {
     const g = face.glyphs.get(ch);
@@ -431,6 +487,75 @@ export function drawCharset(
     const baseline = row * cellH + cellH * 0.72;
     ctx.fill(glyphToPath2D(g, scale, x, baseline), 'nonzero');
   });
+}
+
+/**
+ * One character on its own, at a size you can judge it at, with everything it is measured against.
+ *
+ * The sidebearings are drawn as well as the metrics, because half of what makes a face good is
+ * spacing and spacing is invisible until something marks where it starts and stops. The two upright
+ * rules are the advance; the gap between each and the ink is what the side controls move.
+ */
+export function drawGlyphStudy(
+  canvas: HTMLCanvasElement,
+  face: Face,
+  pal: Palette,
+  ch: string,
+  pad: number,
+): void {
+  const g = face.glyphs.get(ch);
+  const height = 300;
+  const ctx = prepare(canvas, height);
+  if (!ctx || !g) return;
+  const width = canvas.clientWidth;
+  const m = face.metrics;
+
+  const vertical = Math.max(m.asc, m.cap) + m.desc + UPM * 0.12;
+  const px = Math.min(((height - pad) * UPM) / vertical, ((width - pad * 2) * UPM) / Math.max(g.advance, 1) / 1.6);
+  const scale = px / UPM;
+  const baseline = height - m.desc * scale - pad * 0.6;
+  const x0 = pad + (width - pad * 2 - g.advance * scale) / 2;
+
+  const rules: Array<[number, string]> = [
+    [baseline - m.asc * scale, 'ascender'],
+    [baseline - m.cap * scale, 'cap'],
+    [baseline - m.xh * scale, 'x-height'],
+    [baseline, 'baseline'],
+    [baseline + m.desc * scale, 'descender'],
+  ];
+  ctx.font = METRIC_LABEL;
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 1;
+  for (const [y, label] of rules) {
+    if (y < 8 || y > height - 4) continue;
+    ctx.strokeStyle = pal.rule;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(pad, Math.round(y) + 0.5);
+    ctx.lineTo(width - pad, Math.round(y) + 0.5);
+    ctx.stroke();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = pal.muted;
+    ctx.fillText(label, pad, y - 7);
+    ctx.globalAlpha = 1;
+  }
+
+  // The advance, drawn as two uprights, so the space either side of the letter is a thing you can
+  // see rather than a number you have to imagine.
+  ctx.strokeStyle = pal.verd;
+  ctx.globalAlpha = 0.7;
+  ctx.setLineDash([3, 3]);
+  for (const x of [x0, x0 + g.advance * scale]) {
+    ctx.beginPath();
+    ctx.moveTo(Math.round(x) + 0.5, 10);
+    ctx.lineTo(Math.round(x) + 0.5, height - 8);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = pal.ink;
+  if (g.contours.length) ctx.fill(glyphToPath2D(g, scale, x0, baseline), 'nonzero');
 }
 
 // ---------------------------------------------------------------------------------------------
