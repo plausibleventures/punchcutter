@@ -1,8 +1,13 @@
 # punchcutter, built and published to punchcutter.plausible.ventures.
 #
-# The custom domain is carried by `public/CNAME` rather than the repository settings, so the host
-# lives in the tree next to the page that claims it. GitHub clears the Pages HTTPS enforcement flag
-# whenever the custom domain changes, which is worth knowing before concluding the deploy went wrong.
+# The custom domain lives in the repository's Pages settings, not in `public/CNAME`. That file is
+# still built into the artifact and is worth keeping as a record of which host this tree claims, but
+# it does not set anything: a CNAME file only configures the domain for the old branch-based Pages
+# build. On a workflow deploy like this one the domain has to be set on the repository, and a site
+# that is missing it answers on github.io and nowhere else.
+#
+# GitHub also clears the Pages HTTPS enforcement flag whenever the custom domain changes, and does
+# not put it back. Both are worth knowing before concluding a deploy went wrong.
 name: pages
 
 on:
