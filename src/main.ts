@@ -7,6 +7,7 @@
  * for the specimen and the file to disagree about what the typeface is.
  */
 
+import { startAnalytics, track } from './analytics';
 import { buildFace, type Face } from './font';
 import { ALTERNATES, CHARSET } from './glyphs';
 import {
@@ -164,6 +165,7 @@ function buildFamilies(): void {
  */
 function pickFamily(id: FamilyId): void {
   const f = familyOf(id);
+  if (id !== state.design.family) track('family_pick', { family: id });
   state.design = { family: id, params: { ...f.params }, alts: [...f.alts], edits: {} };
   state.name = '';
   nameField.value = '';
@@ -238,6 +240,7 @@ function buildConsole(): void {
       state.name = '';
       nameField.value = '';
       state.design = { family: p.family, params: clampParams(p.params), alts: [...p.alts], edits: {} };
+      track('style_pick', { family: p.family, style: p.name });
       syncConsole();
       writeHash();
       render();
@@ -274,6 +277,7 @@ function toggleAlt(key: AltKey): void {
   const group = EXCLUSIVE.find((g) => g.includes(key)) ?? [];
   const next = state.design.alts.filter((k) => k !== key && !group.includes(k));
   if (!on) next.push(key);
+  track('alt_toggle', { alt: key, on: !on });
   state.design = { ...state.design, alts: next };
   syncConsole();
   writeHash();
@@ -417,6 +421,8 @@ function buildInspector(): void {
 }
 
 function pick(ch: string | null): void {
+  // The character is a selection from this repo's own charset, not something anybody typed.
+  if (ch && ch !== state.picked) track('glyph_open', { glyph: ch });
   state.picked = ch;
   syncInspector();
   render();
@@ -613,6 +619,11 @@ function download(): void {
   // Revoked on the next turn of the event loop: Safari needs the element to have been clicked
   // before the URL goes away, and every browser is finished with it by then.
   setTimeout(() => URL.revokeObjectURL(url), 0);
+  // The family, whether any letter was hand-tuned and how many. Never the name, never the axes.
+  track('download', {
+    family: state.design.family,
+    tuned: Object.keys(state.design.edits).length,
+  });
   say(`Saved ${names.postscript}.ttf — ${(bytes.length / 1024).toFixed(0)} KB. Open it to install.`);
 }
 
@@ -624,6 +635,8 @@ async function share(): Promise<void> {
   const link = `${location.origin}${location.pathname}#${q.toString()}`;
   try {
     await navigator.clipboard.writeText(link);
+    // Emphatically not the link: it is the whole design and the whole specimen line.
+    track('share', { family: state.design.family });
     say('Link copied. It opens on this exact face.');
   } catch {
     history.replaceState(null, '', `#${q.toString()}`);
@@ -645,6 +658,7 @@ function surprise(): void {
   const heavy = (weight - 24) / 144;
   const family = familyOf(state.design.family);
   const has = (k: keyof Params) => family.axes.includes(k);
+  track('surprise', { family: state.design.family });
   state.name = '';
   nameField.value = '';
   set({
@@ -700,6 +714,7 @@ const consoleBox = el('console');
 el('console-handle').addEventListener('click', () => {
   const open = consoleBox.dataset.open !== 'false';
   consoleBox.dataset.open = String(!open);
+  track('drawer_toggle', { open: !open });
   el('console-handle').setAttribute('aria-expanded', String(!open));
   // The sheet has just changed how much room it has; the canvases are sized against it.
   requestAnimationFrame(repaint);
@@ -723,4 +738,5 @@ window.addEventListener('resize', repaint);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
 document.fonts.ready.then(repaint);
 
+startAnalytics();
 render();
