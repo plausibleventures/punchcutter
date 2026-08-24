@@ -7,7 +7,7 @@
  * for the specimen and the file to disagree about what the typeface is.
  */
 
-import { startAnalytics, track } from './analytics';
+import { track } from './analytics';
 import { buildFace, type Face } from './font';
 import { ALTERNATES, CHARSET } from './glyphs';
 import {
@@ -738,5 +738,4 @@ window.addEventListener('resize', repaint);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
 document.fonts.ready.then(repaint);
 
-startAnalytics();
 render();

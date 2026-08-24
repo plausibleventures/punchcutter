@@ -15,6 +15,33 @@
     <meta property="og:type" content="website" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2315181a'/%3E%3Cpath d='M9 24V8h7a5 5 0 0 1 0 10h-4' stroke='%23edefec' stroke-width='3.4' fill='none' stroke-linecap='square'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <!--
+      Google Analytics.
+      Two deviations from the stock snippet, and both are load-bearing.
+
+      The host check: a property polluted by the author's own reloads on localhost is a property
+      nobody trusts three months later, so nothing runs anywhere but the deployed host.
+
+      The pinned `page_location`: **the whole design lives in the `?s=` parameter of this URL.**
+      GA4's default is to send the full location, query string included — which would upload every
+      typeface anybody makes straight to Google. Pinning it to the bare page is what keeps
+      that from happening, and it is the entire reason this is not the snippet Google hands you.
+    -->
+    <script>
+      if (location.hostname === 'punchcutter.plausible.ventures') {
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', 'G-297ZBRFQ2G', {
+          page_location: 'https://punchcutter.plausible.ventures/',
+          page_path: '/',
+        });
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-297ZBRFQ2G';
+        document.head.appendChild(s);
+      }
+    </script>
   </head>
   <body>
     <a class="skip" href="#console">Skip to the controls</a>
